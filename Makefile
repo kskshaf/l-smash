@@ -14,11 +14,13 @@ SRC_ALL = $(SRCS) $(SRC_TOOLS)
 
 #### main rules ####
 
-.PHONY: all lib install install-lib clean distclean dep depend
+.PHONY: all lib static-lib install install-lib clean distclean dep depend
 
 all: $(STATICLIB) $(SHAREDLIB) $(TOOLS)
 
 lib: $(STATICLIB) $(SHAREDLIB)
+
+static-lib: $(STATICLIB)
 
 $(STATICLIBNAME): $(OBJS)
 	$(AR) rc $@ $^
