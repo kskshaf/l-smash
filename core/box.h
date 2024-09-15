@@ -502,6 +502,18 @@ typedef struct {
     uint32_t reserved2[4];
 } isom_dovi_t;
 
+typedef struct {
+    ISOM_BASEBOX_COMMON;
+    uint8_t configurationVersion;
+    uint16_t min_spatial_segmentation_idc;
+    uint8_t parallelismType;
+    uint8_t numTemporalLayers;
+    uint8_t temporalIdNested;
+    uint8_t lengthSizeMinusOne;
+    uint8_t numOfArrays;
+    lsmash_lhevc_paramater_arrays_t *array;
+} isom_lhvC_t;
+
 typedef struct
 {
     /* This box is in RTP and RTP reception hint track sample descriptions */
@@ -838,6 +850,12 @@ typedef struct
 typedef struct
 {
     ISOM_FULLBOX_COMMON;
+    uint32_t projection_type;
+} isom_prji_t;
+
+typedef struct
+{
+    ISOM_FULLBOX_COMMON;
     uint32_t projection_bounds_top;
     uint32_t projection_bounds_bottom;
     uint32_t projection_bounds_left;
@@ -858,6 +876,7 @@ typedef struct
     isom_prhd_t *prhd;
     isom_equi_t *equi;
     isom_cbmp_t *cbmp;
+    isom_prji_t *prji;
 } isom_proj_t;
 
 typedef struct
@@ -866,6 +885,71 @@ typedef struct
     isom_svhd_t *svhd;
     isom_proj_t *proj;
 } isom_sv3d_t;
+
+typedef struct
+{
+    ISOM_FULLBOX_COMMON;
+    uint32_t *required_box_types;
+} isom_must_t;
+
+typedef struct
+{
+    ISOM_FULLBOX_COMMON;
+    uint8_t reserved;
+    uint8_t eye_views_reversed;
+    uint8_t has_additional_views;
+    uint8_t has_right_eye_view;
+    uint8_t has_left_eye_view;
+} isom_stri_t;
+
+typedef struct {
+    ISOM_FULLBOX_COMMON;
+    uint8_t hero_eye_indicator;
+} isom_hero_t;
+
+typedef struct {
+    ISOM_FULLBOX_COMMON;
+    // A value that specifies the distance between centers of the lenses of the camera system.
+    uint32_t micrometers; // See: https://developer.apple.com/documentation/videotoolbox/kvtcompressionpropertykey_stereocamerabaseline
+} isom_blin_t;
+
+typedef struct {
+    ISOM_BASEBOX_COMMON;
+    isom_blin_t *blin;
+} isom_cams_t;
+
+typedef struct {
+    ISOM_FULLBOX_COMMON;
+    // A value that indicates a relative shift of the left and right images, which changes the zero parallax plane.
+    // The value is a 32-bit integer, measured over the range of -10000 to 10000, that maps to a uniform range of -1.0 to 1.0.
+    int32_t adjustment; // See: https://developer.apple.com/documentation/videotoolbox/kvtcompressionpropertykey_horizontaldisparityadjustment
+} isom_dadj_t;
+
+typedef struct {
+    ISOM_BASEBOX_COMMON;
+    isom_dadj_t *dadj;
+} isom_cmfy_t;
+
+typedef struct
+{
+    ISOM_BASEBOX_COMMON;
+    isom_stri_t *stri;
+    isom_hero_t *hero;
+    isom_cams_t *cams;
+    isom_cmfy_t *cmfy;
+} isom_eyes_t;
+
+typedef struct
+{
+    ISOM_BASEBOX_COMMON;
+    isom_eyes_t *eyes;
+} isom_vexu_t;
+
+typedef struct
+{
+    ISOM_BASEBOX_COMMON;
+    uint32_t millidegrees;
+} isom_hfov_t;
 
 /* Sampling Rate Box
  * This box may be present only in an AudioSampleEntryV1, and when present,
@@ -2079,6 +2163,46 @@ typedef struct
     lsmash_entry_list_t *list;  /* entry_count corresponds to reference_count. */
 } isom_sidx_t;
 
+/* Event message box
+ */
+typedef struct
+{
+    ISOM_FULLBOX_COMMON;
+    uint32_t timescale;         /* the timescale, in ticks per second, for the time delta and duration fields within
+                                 * version 0 of this box. */
+    uint32_t event_duration;    /* provides the duration of event in media presentation time. In version 0, the
+                                 * timescale is indicated in the timescale field; in version 1, the timescale of the
+                                 * MovieHeaderBox is used. The value 0xFFFF indicates an unknown duration. */
+    uint32_t id;                /* a field identifying this instance of the message. Messages with equivalent semantics
+                                 * shall have the same value, i.e. processing of any one event message box with the same
+                                 * id is sufficient. */
+    char *scheme_id_uri;        /* a null-terminated ('C') string in UTF-8 characters that identifies the message scheme.
+                                 * The semantics and syntax of the message_data[] are defined by the owner of the scheme
+                                 * identified. The string may use URN or URL syntax. When a URL is used, it is recommended
+                                 * to also contain a month-date in the form mmyyyy; the assignment of the URL must have
+                                 * been authorized by the owner of the domain name in that URL on or very close to that
+                                 * date. A URL may resolve to an Internet location, and a location that does resolve may
+                                 * store a specification of the message scheme. */
+    char *value;                /* is a null-terminated ('C') string in UTF-8 characters that specifies the value for the
+                                 * event. The value space and semantics must be defined by the owners of the scheme identified
+                                 * in the scheme_id_ uri field. */
+    uint8_t *message_data;      /* body of the message, which fills the remainder of the message box. This may be empty
+                                 * depending on the above information. The syntax and semantics of this field must be defined
+                                 * by the owner of the scheme identified in the scheme_id_uri field. */
+    uint32_t message_data_length;
+    /* version == 1 only */
+    uint64_t presentation_time; /* provides the Media Presentation time of the event measured on the Movie timeline,
+                                 * in the timescale provided in the timescale field. */
+    /* version == 0 only */
+    uint32_t presentation_time_delta; /* provides the Media Presentation time delta of the media presentation time of
+                                       * the event and the earliest presentation time in this segment. If the segment
+                                       * index is present, then the earliest presentation time is determined by the
+                                       * field earliest_presentation_time of the first 'sidx' box. If the segment index
+                                       * is not present, the earliest presentation time is determined as the earliest
+                                       * presentation time of any access unit in the media segment. The timescale is
+                                       * provided in the timescale field. */
+} isom_emsg_t;
+
 /** **/
 
 /* File */
@@ -2091,6 +2215,7 @@ struct lsmash_file_tag
     isom_moov_t         *moov;          /* Movie Box */
     lsmash_entry_list_t  sidx_list;     /* Segment Index Box List */
     lsmash_entry_list_t  moof_list;     /* Movie Fragment Box List */
+    lsmash_entry_list_t  emsg_list;     /* Event Message Box List */
     isom_mdat_t         *mdat;          /* Media Data Box */
     isom_meta_t         *meta;          /* Meta Box */
     isom_mfra_t         *mfra;          /* Movie Fragment Random Access Box */
@@ -2150,6 +2275,7 @@ struct lsmash_root_tag
 #define LSMASH_BOX_PRECEDENCE_ISOM_FTYP (LSMASH_BOX_PRECEDENCE_H  -  0 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_STYP (LSMASH_BOX_PRECEDENCE_H  -  0 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_SIDX (LSMASH_BOX_PRECEDENCE_N  +  1 * LSMASH_BOX_PRECEDENCE_S)   /* shall be placed before any 'moof' of the documented subsegments */
+#define LSMASH_BOX_PRECEDENCE_ISOM_EMSG (LSMASH_BOX_PRECEDENCE_N  +  1 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_MOOV (LSMASH_BOX_PRECEDENCE_N  -  0 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_MVHD (LSMASH_BOX_PRECEDENCE_HM -  0 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_IODS (LSMASH_BOX_PRECEDENCE_HM -  2 * LSMASH_BOX_PRECEDENCE_S)
@@ -2183,6 +2309,7 @@ struct lsmash_root_tag
 #define LSMASH_BOX_PRECEDENCE_ISOM_ESDS (LSMASH_BOX_PRECEDENCE_HM -  0 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_QTFF_ESDS (LSMASH_BOX_PRECEDENCE_HM -  1 * LSMASH_BOX_PRECEDENCE_S)   /* preceded by 'frma' and 'mp4a' */
 #define LSMASH_BOX_PRECEDENCE_ISOM_DOVI (LSMASH_BOX_PRECEDENCE_HM -  1 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_LHVC (LSMASH_BOX_PRECEDENCE_HM -  1 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_ST3D (LSMASH_BOX_PRECEDENCE_HM -  1 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_SV3D (LSMASH_BOX_PRECEDENCE_HM -  1 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_SVHD (LSMASH_BOX_PRECEDENCE_HM -  2 * LSMASH_BOX_PRECEDENCE_S)
@@ -2190,6 +2317,17 @@ struct lsmash_root_tag
 #define LSMASH_BOX_PRECEDENCE_ISOM_PRHD (LSMASH_BOX_PRECEDENCE_HM -  3 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_EQUI (LSMASH_BOX_PRECEDENCE_HM -  3 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_CBMP (LSMASH_BOX_PRECEDENCE_HM -  3 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_PRJI (LSMASH_BOX_PRECEDENCE_HM -  3 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_VEXU (LSMASH_BOX_PRECEDENCE_HM -  1 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_EYES (LSMASH_BOX_PRECEDENCE_HM -  2 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_MUST (LSMASH_BOX_PRECEDENCE_HM -  3 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_STRI (LSMASH_BOX_PRECEDENCE_HM -  3 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_HERO (LSMASH_BOX_PRECEDENCE_HM -  3 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_CAMS (LSMASH_BOX_PRECEDENCE_HM -  3 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_BLIN (LSMASH_BOX_PRECEDENCE_HM -  4 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_CMFY (LSMASH_BOX_PRECEDENCE_HM -  3 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_DADJ (LSMASH_BOX_PRECEDENCE_HM -  4 * LSMASH_BOX_PRECEDENCE_S)
+#define LSMASH_BOX_PRECEDENCE_ISOM_HFOV (LSMASH_BOX_PRECEDENCE_HM -  1 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_BTRT (LSMASH_BOX_PRECEDENCE_HM -  1 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_TIMS (LSMASH_BOX_PRECEDENCE_HM -  0 * LSMASH_BOX_PRECEDENCE_S)
 #define LSMASH_BOX_PRECEDENCE_ISOM_TSRO (LSMASH_BOX_PRECEDENCE_HM -  1 * LSMASH_BOX_PRECEDENCE_S)
@@ -2689,6 +2827,7 @@ isom_cspc_t *isom_add_cspc( isom_visual_entry_t *visual );
 isom_sgbt_t *isom_add_sgbt( isom_visual_entry_t *visual );
 isom_stsl_t *isom_add_stsl( isom_visual_entry_t *visual );
 isom_dovi_t *isom_add_dovi( isom_visual_entry_t *visual );
+isom_lhvC_t *isom_add_lhvC( isom_visual_entry_t *visual );
 isom_btrt_t *isom_add_btrt( isom_visual_entry_t *visual );
 isom_tims_t *isom_add_tims( isom_hint_entry_t *hint );
 isom_tsro_t *isom_add_tsro( isom_hint_entry_t *hint );
@@ -2708,6 +2847,17 @@ isom_proj_t *isom_add_proj( isom_sv3d_t *sv3d );
 isom_prhd_t *isom_add_prhd( isom_proj_t *proj );
 isom_equi_t *isom_add_equi( isom_proj_t *proj );
 isom_cbmp_t *isom_add_cbmp( isom_proj_t *proj );
+isom_prji_t *isom_add_prji( isom_proj_t *proj );
+isom_vexu_t *isom_add_vexu( isom_visual_entry_t *visual );
+isom_eyes_t *isom_add_eyes( isom_vexu_t *vexu );
+isom_must_t *isom_add_must( isom_eyes_t *eyes );
+isom_stri_t *isom_add_stri( isom_eyes_t *eyes );
+isom_hero_t *isom_add_hero( isom_eyes_t *eyes );
+isom_cams_t *isom_add_cams( isom_eyes_t *eyes );
+isom_blin_t *isom_add_blin( isom_cams_t *cams );
+isom_cmfy_t *isom_add_cmfy( isom_eyes_t *eyes );
+isom_dadj_t *isom_add_dadj( isom_cmfy_t *cmfy );
+isom_hfov_t *isom_add_hfov( isom_visual_entry_t *visual );
 isom_ftab_t *isom_add_ftab( isom_tx3g_entry_t *tx3g );
 isom_stts_t *isom_add_stts( isom_stbl_t *stbl );
 isom_ctts_t *isom_add_ctts( isom_stbl_t *stbl );
@@ -2755,6 +2905,7 @@ isom_mdat_t *isom_add_mdat( lsmash_file_t *file );
 isom_free_t *isom_add_free( void *parent_box );
 isom_styp_t *isom_add_styp( lsmash_file_t *file );
 isom_sidx_t *isom_add_sidx( lsmash_file_t *file );
+isom_emsg_t *isom_add_emsg( lsmash_file_t *file );
 
 void isom_remove_extension_box( isom_box_t *ext );
 void isom_remove_sample_description( isom_sample_entry_t *sample );
